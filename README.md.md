@@ -1453,7 +1453,7 @@ plt.title('Epochs vs Losses');
 ```
 
 
-![png](output_17_0.png)
+![png](assets/output_17_0.png)
 
 
 
@@ -1467,7 +1467,7 @@ plt.ylim(0, 100);
 ```
 
 
-![png](output_18_0.png)
+![png](assets/output_18_0.png)
 
 
 ## Testing your network
@@ -1666,7 +1666,7 @@ with Image.open(sample_img_dir) as im:
 ```
 
 
-![png](output_33_0.png)
+![png](assets/output_33_0.png)
 
 
 
@@ -1694,7 +1694,7 @@ plt.barh(names, probs);
 ```
 
 
-![png](output_37_0.png)
+![png](assets/output_37_0.png)
 
 
 <font color='red'>**Reminder for Workspace users:** If your network becomes very large when saved as a checkpoint, there might be issues with saving backups in your workspace. You should reduce the size of your hidden layers and train again. 
