@@ -1,11 +1,16 @@
+# 🌸 Flower Images Classifier
 
-# Developing an AI application
+---
+>This is my final project in the AI programming with Python Nanodegree program by Udacity. 
+This project consists of two parts.
+1. Jupyter Notebook part
+2. Command line application to predict the class of a flower once the image is given.
 
-Going forward, AI algorithms will be incorporated into more and more everyday applications. For example, you might want to include an image classifier in a smart phone app. To do this, you'd use a deep learning model trained on hundreds of thousands of images as part of the overall application architecture. A large part of software development in the future will be using these types of models as common parts of applications. 
+---
 
-In this project, you'll train an image classifier to recognize different species of flowers. You can imagine using something like this in a phone app that tells you the name of the flower your camera is looking at. In practice you'd train this classifier, then export it for use in your application. We'll be using [this dataset](http://www.robots.ox.ac.uk/~vgg/data/flowers/102/index.html) of 102 flower categories, you can see a few examples below. 
+In this project, I have trained an image classifier to recognize different species of flowers.  I used [this dataset](http://www.robots.ox.ac.uk/~vgg/data/flowers/102/index.html) of 102 flower categories. These are some examples. 
 
-<img src='assets/Flowers.png' width=500px>
+![flower_intro](assets/Flowers.png)
 
 The project is broken down into multiple steps:
 
@@ -13,15 +18,8 @@ The project is broken down into multiple steps:
 * Train the image classifier on your dataset
 * Use the trained classifier to predict image content
 
-We'll lead you through each part which you'll implement in Python.
-
-When you've completed this project, you'll have an application that can be trained on any set of labeled images. Here your network will be learning about flowers and end up as a command line application. But, what you do with your new skills depends on your imagination and effort in building a dataset. For example, imagine an app where you take a picture of a car, it tells you what the make and model is, then looks up information about it. Go build your own dataset and make something new.
-
-First up is importing the packages you'll need. It's good practice to keep all the imports at the beginning of your code. As you work through this notebook and find you need to import a package, make sure to add the import up here.
-
-
-```
-# Imports here
+```python
+# Imports packages
 import torch
 from torch import nn, optim
 import torch.nn.functional as F
@@ -35,7 +33,7 @@ import matplotlib.pyplot as plt
 
 from PIL import Image
 
-import time
+import time,json
 
 %matplotlib inline
 %config InlineBackend.figure_format = 'retina'
@@ -43,24 +41,19 @@ import time
 
 ## Load the data
 
-Here you'll use `torchvision` to load the data ([documentation](http://pytorch.org/docs/0.3.0/torchvision/index.html)). The data should be included alongside this notebook, otherwise you can [download it here](https://s3.amazonaws.com/content.udacity-data.com/nd089/flower_data.tar.gz). The dataset is split into three parts, training, validation, and testing. For the training, you'll want to apply transformations such as random scaling, cropping, and flipping. This will help the network generalize leading to better performance. You'll also need to make sure the input data is resized to 224x224 pixels as required by the pre-trained networks.
+The dataset is split into three parts, training, validation, and testing. For the training, it is required to use transformations such as random scaling, cropping, and flipping. This will help the network generalize leading to better performance. Make sure data is resized to 224x224 pixels as required by the pre-trained networks.
 
-The validation and testing sets are used to measure the model's performance on data it hasn't seen yet. For this you don't want any scaling or rotation transformations, but you'll need to resize then crop the images to the appropriate size.
+The validation and testing sets are used to measure the model's performance on data it hasn't seen yet. 
 
 The pre-trained networks you'll use were trained on the ImageNet dataset where each color channel was normalized separately. For all three sets you'll need to normalize the means and standard deviations of the images to what the network expects. For the means, it's `[0.485, 0.456, 0.406]` and for the standard deviations `[0.229, 0.224, 0.225]`, calculated from the ImageNet images.  These values will shift each color channel to be centered at 0 and range from -1 to 1.
- 
 
-
-```
+```python
 data_dir = 'flowers'
 train_dir = data_dir + '/train'
 valid_dir = data_dir + '/valid'
 test_dir = data_dir + '/test'
-```
 
-
-```
-# Done: Define your transforms for the training, validation, and testing sets
+# Define your transforms for the training, validation, and testing sets
 train_transforms = transforms.Compose([transforms.RandomRotation(30),
                                        transforms.RandomResizedCrop(224),
                                        transforms.RandomHorizontalFlip(),
@@ -74,12 +67,12 @@ test_valid_transforms = transforms.Compose([transforms.Resize(255),
                                             transforms.ToTensor(),
                                             transforms.Normalize([0.485, 0.456, 0.406],
                                                                  [0.229, 0.224, 0.225])])
-# Done: Load the datasets with ImageFolder
+# Load the datasets with ImageFolder
 train_data = datasets.ImageFolder(train_dir, transform=train_transforms)
 valid_data = datasets.ImageFolder(valid_dir, transform=test_valid_transforms)
 test_data = datasets.ImageFolder(test_dir, transform=test_valid_transforms)
 
-# Done: Using the image datasets and the trainforms, define the dataloaders
+# Using the image datasets and the trainforms, define the dataloaders
 train_loader = torch.utils.data.DataLoader(
     train_data, batch_size=32, shuffle=True)
 valid_loader = torch.utils.data.DataLoader(
@@ -88,122 +81,34 @@ test_loader = torch.utils.data.DataLoader(test_data, batch_size=32)
 
 ```
 
-### Label mapping
+## Label mapping
 
-You'll also need to load in a mapping from category label to category name. You can find this in the file `cat_to_name.json`. It's a JSON object which you can read in with the [`json` module](https://docs.python.org/2/library/json.html). This will give you a dictionary mapping the integer encoded categories to the actual names of the flowers.
+Loads a json file, and convert it into a dictionary mapping the integer encoded categories to the actual names of the flowers.
 
-
-```
-import json
-
+```python
 with open('cat_to_name.json', 'r') as f:
     cat_to_name = json.load(f)
 
-cat_to_name
 
 output_layer_size = len(cat_to_name)
-print(output_layer_size)
-```
-
-    102
-
-
-# Building and training the classifier
-
-Now that the data is ready, it's time to build and train the classifier. As usual, you should use one of the pretrained models from `torchvision.models` to get the image features. Build and train a new feed-forward classifier using those features.
-
-We're going to leave this part up to you. Refer to [the rubric](https://review.udacity.com/#!/rubrics/1663/view) for guidance on successfully completing this section. Things you'll need to do:
-
-* Load a [pre-trained network](http://pytorch.org/docs/master/torchvision/models.html) (If you need a starting point, the VGG networks work great and are straightforward to use)
-* Define a new, untrained feed-forward network as a classifier, using ReLU activations and dropout
-* Train the classifier layers using backpropagation using the pre-trained network to get the features
-* Track the loss and accuracy on the validation set to determine the best hyperparameters
-
-We've left a cell open for you below, but use as many as you need. Our advice is to break the problem up into smaller parts you can run separately. Check that each part is doing what you expect, then move on to the next. You'll likely find that as you work through each part, you'll need to go back and modify your previous code. This is totally normal!
-
-When training make sure you're updating only the weights of the feed-forward network. You should be able to get the validation accuracy above 70% if you build everything right. Make sure to try different hyperparameters (learning rate, units in the classifier, epochs, etc) to find the best model. Save those hyperparameters to use as default values in the next part of the project.
-
-One last important tip if you're using the workspace to run your code: To avoid having your workspace disconnect during the long-running tasks in this notebook, please read in the earlier page in this lesson called Intro to
-GPU Workspaces about Keeping Your Session Active. You'll want to include code from the workspace_utils.py module.
-
-<font color='red'>**Note for Workspace users:** If your network is over 1 GB when saved as a checkpoint, there might be issues with saving backups in your workspace. Typically this happens with wide dense layers after the convolutional layers. If your saved checkpoint is larger than 1 GB (you can open a terminal and check with `ls -lh`), you should reduce the size of your hidden layers and train again.</font>
-
 
 ```
-# To keep the session active for some time
-import signal
-
-from contextlib import contextmanager
-
-import requests
 
 
-DELAY = INTERVAL = 4 * 60  # interval time in seconds
-MIN_DELAY = MIN_INTERVAL = 2 * 60
-KEEPALIVE_URL = "https://nebula.udacity.com/api/v1/remote/keep-alive"
-TOKEN_URL = "http://metadata.google.internal/computeMetadata/v1/instance/attributes/keep_alive_token"
-TOKEN_HEADERS = {"Metadata-Flavor":"Google"}
+## Building and training the classifier
 
-
-def _request_handler(headers):
-    def _handler(signum, frame):
-        requests.request("POST", KEEPALIVE_URL, headers=headers)
-    return _handler
-
-
-@contextmanager
-def active_session(delay=DELAY, interval=INTERVAL):
-    """
-    Example:
-
-    from workspace_utils import active session
-
-    with active_session():
-        # do long-running work here
-    """
-    token = requests.request("GET", TOKEN_URL, headers=TOKEN_HEADERS).text
-    headers = {'Authorization': "STAR " + token}
-    delay = max(delay, MIN_DELAY)
-    interval = max(interval, MIN_INTERVAL)
-    original_handler = signal.getsignal(signal.SIGALRM)
-    try:
-        signal.signal(signal.SIGALRM, _request_handler(headers))
-        signal.setitimer(signal.ITIMER_REAL, delay, interval)
-        yield
-    finally:
-        signal.signal(signal.SIGALRM, original_handler)
-        signal.setitimer(signal.ITIMER_REAL, 0)
-
-
-def keep_awake(iterable, delay=DELAY, interval=INTERVAL):
-    """
-    Example:
-
-    from workspace_utils import keep_awake
-
-    for i in keep_awake(range(5)):
-        # do iteration with lots of work here
-    """
-    with active_session(delay, interval): yield from iterable
-```
-
-
-```
-# TODO: Build and train your network
+```python
+# Build and train your network
 model = models.densenet201(pretrained=True)
 
 # To view the model architecture
 model 
 ```
 
-    /opt/conda/lib/python3.6/site-packages/torchvision-0.2.1-py3.6.egg/torchvision/models/densenet.py:212: UserWarning: nn.init.kaiming_normal is now deprecated in favor of nn.init.kaiming_normal_.
+```cmd
     Downloading: "https://download.pytorch.org/models/densenet201-c1103571.pth" to /root/.torch/models/densenet201-c1103571.pth
     100%|██████████| 81131730/81131730 [00:01<00:00, 64976186.49it/s]
-
-
-
-
-
+```
     DenseNet(
       (features): Sequential(
         (conv0): Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
@@ -219,782 +124,9 @@ model
             (relu2): ReLU(inplace)
             (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
           )
-          (denselayer2): _DenseLayer(
-            (norm1): BatchNorm2d(96, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(96, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer3): _DenseLayer(
-            (norm1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer4): _DenseLayer(
-            (norm1): BatchNorm2d(160, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(160, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer5): _DenseLayer(
-            (norm1): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(192, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer6): _DenseLayer(
-            (norm1): BatchNorm2d(224, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(224, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-        )
-        (transition1): _Transition(
-          (norm): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-          (relu): ReLU(inplace)
-          (conv): Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-          (pool): AvgPool2d(kernel_size=2, stride=2, padding=0)
-        )
-        (denseblock2): _DenseBlock(
-          (denselayer1): _DenseLayer(
-            (norm1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer2): _DenseLayer(
-            (norm1): BatchNorm2d(160, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(160, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer3): _DenseLayer(
-            (norm1): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(192, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer4): _DenseLayer(
-            (norm1): BatchNorm2d(224, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(224, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer5): _DenseLayer(
-            (norm1): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer6): _DenseLayer(
-            (norm1): BatchNorm2d(288, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(288, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer7): _DenseLayer(
-            (norm1): BatchNorm2d(320, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(320, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer8): _DenseLayer(
-            (norm1): BatchNorm2d(352, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(352, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer9): _DenseLayer(
-            (norm1): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(384, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer10): _DenseLayer(
-            (norm1): BatchNorm2d(416, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(416, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer11): _DenseLayer(
-            (norm1): BatchNorm2d(448, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(448, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer12): _DenseLayer(
-            (norm1): BatchNorm2d(480, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(480, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-        )
-        (transition2): _Transition(
-          (norm): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-          (relu): ReLU(inplace)
-          (conv): Conv2d(512, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
-          (pool): AvgPool2d(kernel_size=2, stride=2, padding=0)
-        )
-        (denseblock3): _DenseBlock(
-          (denselayer1): _DenseLayer(
-            (norm1): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(256, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer2): _DenseLayer(
-            (norm1): BatchNorm2d(288, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(288, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer3): _DenseLayer(
-            (norm1): BatchNorm2d(320, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(320, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer4): _DenseLayer(
-            (norm1): BatchNorm2d(352, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(352, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer5): _DenseLayer(
-            (norm1): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(384, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer6): _DenseLayer(
-            (norm1): BatchNorm2d(416, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(416, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer7): _DenseLayer(
-            (norm1): BatchNorm2d(448, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(448, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer8): _DenseLayer(
-            (norm1): BatchNorm2d(480, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(480, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer9): _DenseLayer(
-            (norm1): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(512, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer10): _DenseLayer(
-            (norm1): BatchNorm2d(544, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(544, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer11): _DenseLayer(
-            (norm1): BatchNorm2d(576, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(576, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer12): _DenseLayer(
-            (norm1): BatchNorm2d(608, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(608, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer13): _DenseLayer(
-            (norm1): BatchNorm2d(640, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(640, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer14): _DenseLayer(
-            (norm1): BatchNorm2d(672, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(672, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer15): _DenseLayer(
-            (norm1): BatchNorm2d(704, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(704, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer16): _DenseLayer(
-            (norm1): BatchNorm2d(736, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(736, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer17): _DenseLayer(
-            (norm1): BatchNorm2d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(768, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer18): _DenseLayer(
-            (norm1): BatchNorm2d(800, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(800, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer19): _DenseLayer(
-            (norm1): BatchNorm2d(832, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(832, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer20): _DenseLayer(
-            (norm1): BatchNorm2d(864, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(864, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer21): _DenseLayer(
-            (norm1): BatchNorm2d(896, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(896, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer22): _DenseLayer(
-            (norm1): BatchNorm2d(928, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(928, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer23): _DenseLayer(
-            (norm1): BatchNorm2d(960, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(960, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer24): _DenseLayer(
-            (norm1): BatchNorm2d(992, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(992, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer25): _DenseLayer(
-            (norm1): BatchNorm2d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1024, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer26): _DenseLayer(
-            (norm1): BatchNorm2d(1056, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1056, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer27): _DenseLayer(
-            (norm1): BatchNorm2d(1088, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1088, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer28): _DenseLayer(
-            (norm1): BatchNorm2d(1120, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1120, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer29): _DenseLayer(
-            (norm1): BatchNorm2d(1152, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1152, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer30): _DenseLayer(
-            (norm1): BatchNorm2d(1184, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1184, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer31): _DenseLayer(
-            (norm1): BatchNorm2d(1216, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1216, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer32): _DenseLayer(
-            (norm1): BatchNorm2d(1248, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1248, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer33): _DenseLayer(
-            (norm1): BatchNorm2d(1280, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1280, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer34): _DenseLayer(
-            (norm1): BatchNorm2d(1312, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1312, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer35): _DenseLayer(
-            (norm1): BatchNorm2d(1344, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1344, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer36): _DenseLayer(
-            (norm1): BatchNorm2d(1376, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1376, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer37): _DenseLayer(
-            (norm1): BatchNorm2d(1408, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1408, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer38): _DenseLayer(
-            (norm1): BatchNorm2d(1440, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1440, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer39): _DenseLayer(
-            (norm1): BatchNorm2d(1472, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1472, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer40): _DenseLayer(
-            (norm1): BatchNorm2d(1504, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1504, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer41): _DenseLayer(
-            (norm1): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1536, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer42): _DenseLayer(
-            (norm1): BatchNorm2d(1568, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1568, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer43): _DenseLayer(
-            (norm1): BatchNorm2d(1600, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1600, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer44): _DenseLayer(
-            (norm1): BatchNorm2d(1632, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1632, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer45): _DenseLayer(
-            (norm1): BatchNorm2d(1664, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1664, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer46): _DenseLayer(
-            (norm1): BatchNorm2d(1696, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1696, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer47): _DenseLayer(
-            (norm1): BatchNorm2d(1728, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1728, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer48): _DenseLayer(
-            (norm1): BatchNorm2d(1760, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1760, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-        )
-        (transition3): _Transition(
-          (norm): BatchNorm2d(1792, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-          (relu): ReLU(inplace)
-          (conv): Conv2d(1792, 896, kernel_size=(1, 1), stride=(1, 1), bias=False)
-          (pool): AvgPool2d(kernel_size=2, stride=2, padding=0)
-        )
-        (denseblock4): _DenseBlock(
-          (denselayer1): _DenseLayer(
-            (norm1): BatchNorm2d(896, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(896, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer2): _DenseLayer(
-            (norm1): BatchNorm2d(928, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(928, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer3): _DenseLayer(
-            (norm1): BatchNorm2d(960, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(960, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer4): _DenseLayer(
-            (norm1): BatchNorm2d(992, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(992, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer5): _DenseLayer(
-            (norm1): BatchNorm2d(1024, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1024, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer6): _DenseLayer(
-            (norm1): BatchNorm2d(1056, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1056, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer7): _DenseLayer(
-            (norm1): BatchNorm2d(1088, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1088, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer8): _DenseLayer(
-            (norm1): BatchNorm2d(1120, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1120, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer9): _DenseLayer(
-            (norm1): BatchNorm2d(1152, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1152, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer10): _DenseLayer(
-            (norm1): BatchNorm2d(1184, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1184, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer11): _DenseLayer(
-            (norm1): BatchNorm2d(1216, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1216, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer12): _DenseLayer(
-            (norm1): BatchNorm2d(1248, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1248, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer13): _DenseLayer(
-            (norm1): BatchNorm2d(1280, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1280, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer14): _DenseLayer(
-            (norm1): BatchNorm2d(1312, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1312, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer15): _DenseLayer(
-            (norm1): BatchNorm2d(1344, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1344, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer16): _DenseLayer(
-            (norm1): BatchNorm2d(1376, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1376, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer17): _DenseLayer(
-            (norm1): BatchNorm2d(1408, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1408, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer18): _DenseLayer(
-            (norm1): BatchNorm2d(1440, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1440, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer19): _DenseLayer(
-            (norm1): BatchNorm2d(1472, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1472, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer20): _DenseLayer(
-            (norm1): BatchNorm2d(1504, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1504, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer21): _DenseLayer(
-            (norm1): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1536, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer22): _DenseLayer(
-            (norm1): BatchNorm2d(1568, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1568, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer23): _DenseLayer(
-            (norm1): BatchNorm2d(1600, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1600, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer24): _DenseLayer(
-            (norm1): BatchNorm2d(1632, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1632, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer25): _DenseLayer(
-            (norm1): BatchNorm2d(1664, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1664, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer26): _DenseLayer(
-            (norm1): BatchNorm2d(1696, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1696, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer27): _DenseLayer(
-            (norm1): BatchNorm2d(1728, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1728, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer28): _DenseLayer(
-            (norm1): BatchNorm2d(1760, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1760, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
-          (denselayer29): _DenseLayer(
-            (norm1): BatchNorm2d(1792, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu1): ReLU(inplace)
-            (conv1): Conv2d(1792, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
-            (norm2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-            (relu2): ReLU(inplace)
-            (conv2): Conv2d(128, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-          )
+          ...
+          ...
+          ...
           (denselayer30): _DenseLayer(
             (norm1): BatchNorm2d(1824, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
             (relu1): ReLU(inplace)
@@ -1028,13 +160,13 @@ model
 
 
 
-```
+```python
 input_layer_size = model.classifier.in_features
 output_layer_size = len(cat_to_name)
 ```
 
 
-```
+```python
 class FlowerClassifier(nn.Module):
 
     """
@@ -1084,13 +216,14 @@ class FlowerClassifier(nn.Module):
 ```
 
 
-```
-# Use GPU if it's available
+```python
+# Use GPU for computaion if it's available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu");
 ```
 
 
-```
+```python
+# funtion to train the model
 def train(model, epochs, criterion, optimizer, train_loader=train_loader, valid_loader=valid_loader, manual_seed=42):
     """
         Train the given model.
@@ -1182,6 +315,7 @@ def train(model, epochs, criterion, optimizer, train_loader=train_loader, valid_
     
     return performance_list
     
+# function to test the model performance
 def validation(model, criterion, test_loader, device):
     
     """"
@@ -1233,7 +367,7 @@ def validation(model, criterion, test_loader, device):
 ```
 
 
-```
+```python
 model = models.densenet201(pretrained=True)
 
 # Freeze parameters so we don't backprop through them
@@ -1252,10 +386,7 @@ criterion = nn.NLLLoss()
 model_list = train(model=model, epochs=16, optimizer=optimizer, criterion=criterion)
 
 ```
-
-    /opt/conda/lib/python3.6/site-packages/torchvision-0.2.1-py3.6.egg/torchvision/models/densenet.py:212: UserWarning: nn.init.kaiming_normal is now deprecated in favor of nn.init.kaiming_normal_.
-
-
+```cmd
     Epoch: 1, Train loss: 3.917, Valid loss: 2.767, Accuracy: 26.976%, time duration per epoch: 194.214s
     Epoch: 2, Train loss: 2.926, Valid loss: 2.045, Accuracy: 42.762%, time duration per epoch: 376.733s
     Epoch: 3, Train loss: 2.527, Valid loss: 1.847, Accuracy: 51.656%, time duration per epoch: 559.668s
@@ -1273,9 +404,8 @@ model_list = train(model=model, epochs=16, optimizer=optimizer, criterion=criter
     Epoch: 15, Train loss: 1.704, Valid loss: 0.835, Accuracy: 77.658%, time duration per epoch: 2745.755s
     Epoch: 16, Train loss: 1.643, Valid loss: 0.812, Accuracy: 79.046%, time duration per epoch: 2927.450s
 
-
-
 ```
+```python
 # dataframe to store performance of the model, so that we can change the hyperparameters
 model_performance_architecture_df = pd.DataFrame(model_list)
 model_performance_architecture_df.rename(
@@ -1288,162 +418,9 @@ model_performance_architecture_df.rename(
     },inplace=True)
 
 model_performance_df = model_performance_architecture_df.iloc[:, :4]
-
 ```
 
-
-```
-model_performance_df
-```
-
-
-
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>epoch</th>
-      <th>train_loss</th>
-      <th>valid_loss</th>
-      <th>valid_accuracy</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>1</td>
-      <td>3.917416</td>
-      <td>2.767314</td>
-      <td>26.976496</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>2</td>
-      <td>2.926173</td>
-      <td>2.044865</td>
-      <td>42.761752</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>3</td>
-      <td>2.527467</td>
-      <td>1.846777</td>
-      <td>51.655983</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>4</td>
-      <td>2.375556</td>
-      <td>1.554904</td>
-      <td>57.118056</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>5</td>
-      <td>2.161358</td>
-      <td>1.327954</td>
-      <td>64.369658</td>
-    </tr>
-    <tr>
-      <th>5</th>
-      <td>6</td>
-      <td>2.070409</td>
-      <td>1.289196</td>
-      <td>64.155983</td>
-    </tr>
-    <tr>
-      <th>6</th>
-      <td>7</td>
-      <td>1.949211</td>
-      <td>1.281741</td>
-      <td>64.556624</td>
-    </tr>
-    <tr>
-      <th>7</th>
-      <td>8</td>
-      <td>1.887351</td>
-      <td>1.086951</td>
-      <td>70.352564</td>
-    </tr>
-    <tr>
-      <th>8</th>
-      <td>9</td>
-      <td>1.844645</td>
-      <td>1.023926</td>
-      <td>71.380876</td>
-    </tr>
-    <tr>
-      <th>9</th>
-      <td>10</td>
-      <td>1.826056</td>
-      <td>1.042417</td>
-      <td>71.821581</td>
-    </tr>
-    <tr>
-      <th>10</th>
-      <td>11</td>
-      <td>1.806784</td>
-      <td>1.065054</td>
-      <td>71.314103</td>
-    </tr>
-    <tr>
-      <th>11</th>
-      <td>12</td>
-      <td>1.697233</td>
-      <td>0.862885</td>
-      <td>76.068376</td>
-    </tr>
-    <tr>
-      <th>12</th>
-      <td>13</td>
-      <td>1.734865</td>
-      <td>0.919418</td>
-      <td>75.681090</td>
-    </tr>
-    <tr>
-      <th>13</th>
-      <td>14</td>
-      <td>1.712786</td>
-      <td>0.908225</td>
-      <td>75.347222</td>
-    </tr>
-    <tr>
-      <th>14</th>
-      <td>15</td>
-      <td>1.704151</td>
-      <td>0.835111</td>
-      <td>77.657585</td>
-    </tr>
-    <tr>
-      <th>15</th>
-      <td>16</td>
-      <td>1.643191</td>
-      <td>0.811979</td>
-      <td>79.046474</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
-
-```
+```python
 plt.plot(model_performance_df['epoch'], model_performance_df['valid_loss'],'-o',label='validation loss')
 plt.plot(model_performance_df['epoch'], model_performance_df['train_loss'], '-x', label='training loss');
 
@@ -1457,7 +434,7 @@ plt.title('Epochs vs Losses');
 
 
 
-```
+```python
 plt.plot(model_performance_df['epoch'], model_performance_df['valid_accuracy'])
 plt.xlabel('Epochs')
 plt.ylabel('Percentage')
@@ -1470,13 +447,12 @@ plt.ylim(0, 100);
 ![png](assets/output_18_0.png)
 
 
-## Testing your network
+## Testing the network
 
-It's good practice to test your trained network on test data, images the network has never seen either in training or validation. This will give you a good estimate for the model's performance on completely new images. Run the test images through the network and measure the accuracy, the same way you did validation. You should be able to reach around 70% accuracy on the test set if the model has been trained well.
+The network is tested on the images that the network has never seen either in training or validation. This gives a good estimate for the model's performance on completely new images. 
 
-
-```
-# TODO: Do validation on the test set
+```python
+# Do validation on the test set
 validation(model, nn.NLLLoss(), test_loader, 'cuda');
 ```
 
@@ -1486,15 +462,13 @@ validation(model, nn.NLLLoss(), test_loader, 'cuda');
 
 ## Save the checkpoint
 
-Now that your network is trained, save the model so you can load it later for making predictions. You probably want to save other things such as the mapping of classes to indices which you get from one of the image datasets: `image_datasets['train'].class_to_idx`. You can attach this to the model as an attribute which makes inference easier later on.
+Here after the network is trained, it is saved in oreder to load it later for making predictions. 
 
-```model.class_to_idx = image_datasets['train'].class_to_idx```
+Make sure to include any information that is needed in the checkpoint, to rebuild the model for inference.
+It is necessary to include pretrained network architecture as well. Otherwise conflicts can be happened.
 
-Remember that you'll want to completely rebuild the model later so you can use it for inference. Make sure to include any information you need in the checkpoint. If you want to load the model and keep training, you'll want to save the number of epochs as well as the optimizer state, `optimizer.state_dict`. You'll likely want to use this trained model in the next part of the project, so best to save it now.
-
-
-```
-# TODO: Save the checkpoint 
+```Python
+# Save the checkpoint 
 checkpoint = {'input_size' : input_layer_size,
              'output_size' : output_layer_size,
              'hidden_layers' : [each.out_features for each in model.classifier.hidden_layers],
@@ -1509,8 +483,9 @@ torch.save(checkpoint, 'checkpoint.pth')
 At this point it's good to write a function that can load a checkpoint and rebuild the model. That way you can come back to this project and keep working on it without having to retrain the network.
 
 
-```
-# TODO: Write a function that loads a checkpoint and rebuilds the model
+
+```python
+# Write a function that loads a checkpoint and rebuilds the model
 def load_checkpoint(filepath, idx, test_data):
     checkpoint = torch.load(filepath)
     
@@ -1530,16 +505,14 @@ def load_checkpoint(filepath, idx, test_data):
 ```
 
 
-```
+```python
 imported_model = load_checkpoint('checkpoint.pth', idx=3, test_data=test_data)
 ```
 
-    /opt/conda/lib/python3.6/site-packages/torchvision-0.2.1-py3.6.egg/torchvision/models/densenet.py:212: UserWarning: nn.init.kaiming_normal is now deprecated in favor of nn.init.kaiming_normal_.
 
+## Inference for classification
 
-# Inference for classification
-
-Now you'll write a function to use a trained network for inference. That is, you'll pass an image into the network and predict the class of the flower in the image. Write a function called `predict` that takes an image and a model, then returns the top $K$ most likely classes along with the probabilities. It should look like 
+Her an image is parsed into the network and then the class of the flower in the image is predicted.
 
 ```python
 probs, classes = predict(image_path, model)
@@ -1549,28 +522,23 @@ print(classes)
 > ['70', '3', '45', '62', '55']
 ```
 
-First you'll need to handle processing the input image such that it can be used in your network. 
-
 ## Image Preprocessing
 
-You'll want to use `PIL` to load the image ([documentation](https://pillow.readthedocs.io/en/latest/reference/Image.html)). It's best to write a function that preprocesses the image so it can be used as input for the model. This function should process the images in the same manner used for training. 
+First, resize the images where the shortest side is 256 pixels, keeping the aspect ratio. This can be done with the [`thumbnail`](http://pillow.readthedocs.io/en/3.1.x/reference/Image.html#PIL.Image.Image.thumbnail) or [`resize`](http://pillow.readthedocs.io/en/3.1.x/reference/Image.html#PIL.Image.Image.thumbnail) methods. Then  the center 224x224 portion of the image., has to be cropped out. you'll need to crop out the center 
 
-First, resize the images where the shortest side is 256 pixels, keeping the aspect ratio. This can be done with the [`thumbnail`](http://pillow.readthedocs.io/en/3.1.x/reference/Image.html#PIL.Image.Image.thumbnail) or [`resize`](http://pillow.readthedocs.io/en/3.1.x/reference/Image.html#PIL.Image.Image.thumbnail) methods. Then you'll need to crop out the center 224x224 portion of the image.
+Color channels of images are typically encoded as integers 0-255, but the model expected floats 0-1. Now the values are converted using with a Numpy array, which can be returned from a PIL image like so `np_image = np.array(pil_image)`.
 
-Color channels of images are typically encoded as integers 0-255, but the model expected floats 0-1. You'll need to convert the values. It's easiest with a Numpy array, which you can get from a PIL image like so `np_image = np.array(pil_image)`.
+As before, the network expects the images to be normalized in a specific way. For the means, it's `[0.485, 0.456, 0.406]` and for the standard deviations `[0.229, 0.224, 0.225]`. Now, subtract the means from each color channel, then divide by the standard deviation. 
 
-As before, the network expects the images to be normalized in a specific way. For the means, it's `[0.485, 0.456, 0.406]` and for the standard deviations `[0.229, 0.224, 0.225]`. You'll want to subtract the means from each color channel, then divide by the standard deviation. 
+And finally, PyTorch expects the color channel to be the first dimension but it's the third dimension in the PIL image and Numpy array. We can reorder dimensions using [`ndarray.transpose`](https://docs.scipy.org/doc/numpy-1.13.0/reference/generated/numpy.ndarray.transpose.html). The color channel needs to be first and retain the order of the other two dimensions.
 
-And finally, PyTorch expects the color channel to be the first dimension but it's the third dimension in the PIL image and Numpy array. You can reorder dimensions using [`ndarray.transpose`](https://docs.scipy.org/doc/numpy-1.13.0/reference/generated/numpy.ndarray.transpose.html). The color channel needs to be first and retain the order of the other two dimensions.
-
-
-```
+```python
 def process_image(image):
     ''' Scales, crops, and normalizes a PIL image for a PyTorch model,
         returns an Numpy array
     '''
 
-    # TODO: Process a PIL image for use in a PyTorch model
+    # Process a PIL image for use in a PyTorch model
     preprocess = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
@@ -1582,10 +550,8 @@ def process_image(image):
 
 ```
 
-To check your work, the function below converts a PyTorch tensor and displays it in the notebook. If your `process_image` function works, running the output through this function should return the original image (except for the cropped out portions).
-
-
-```
+```python
+# function to return the original image
 def imshow(image, ax=None, title=None):
     """Imshow for Tensor."""
     if ax is None:
@@ -1609,12 +575,6 @@ def imshow(image, ax=None, title=None):
 
 ## Class Prediction
 
-Once you can get images in the correct format, it's time to write a function for making predictions with your model. A common practice is to predict the top 5 or so (usually called top-$K$) most probable classes. You'll want to calculate the class probabilities then find the $K$ largest values.
-
-To get the top $K$ largest values in a tensor use [`x.topk(k)`](http://pytorch.org/docs/master/torch.html#torch.topk). This method returns both the highest `k` probabilities and the indices of those probabilities corresponding to the classes. You need to convert from these indices to the actual class labels using `class_to_idx` which hopefully you added to the model or from an `ImageFolder` you used to load the data ([see here](#Save-the-checkpoint)). Make sure to invert the dictionary so you get a mapping from index to class as well.
-
-Again, this method should take a path to an image and a model checkpoint, then return the probabilities and classes.
-
 ```python
 probs, classes = predict(image_path, model)
 print(probs)
@@ -1623,13 +583,12 @@ print(classes)
 > ['70', '3', '45', '62', '55']
 ```
 
-
-```
+```python
 def predict(image_path, model, topk=5):
     ''' Predict the class (or classes) of an image using a trained deep learning model.
     '''
     
-    # TODO: Implement the code to predict the class from an image file
+    # Implement the code to predict the class from an image file
     with Image.open(image_path) as im:
         image = process_image(im)
     image.unsqueeze_(0)
@@ -1649,15 +608,14 @@ def predict(image_path, model, topk=5):
 
 ## Sanity Checking
 
-Now that you can use a trained model for predictions, check to make sure it makes sense. Even if the testing accuracy is high, it's always good to check that there aren't obvious bugs. Use `matplotlib` to plot the probabilities for the top 5 classes as a bar graph, along with the input image. It should look like this:
+Even if the testing accuracy is high, it's always good to check that there aren't obvious bugs. Use `matplotlib` to plot the probabilities for the top 5 classes as a bar graph, along with the input image. It should look like this:
 
-<img src='assets/inference_example.png' width=300px>
+<!-- ![inference_example](assets/inference_example.png) -->
 
-You can convert from the class integer encoding to actual flower names with the `cat_to_name.json` file (should have been loaded earlier in the notebook). To show a PyTorch tensor as an image, use the `imshow` function defined above.
+The class integer encoding can be converted to actual flower names with the `cat_to_name.json` file (should have been loaded earlier in the notebook). To show a PyTorch tensor as an image, use the `imshow` function defined above.
 
-
-```
-# Done: Display an image along with the top 5 classes
+```python
+# Display an image along with the top 5 classes
 # show sample photo
 sample_img_dir = 'flowers/train/7/image_07203.jpg'
 with Image.open(sample_img_dir) as im:
@@ -1666,47 +624,25 @@ with Image.open(sample_img_dir) as im:
 ```
 
 
-![png](assets/output_33_0.png)
+![inference_flower](assets/output_33_0.png)
 
 
 
-```
+```python
 probs, classes = predict(sample_img_dir, imported_model)
 ```
 
     Probabilities: tensor([[ 0.1818,  0.1474,  0.1250,  0.0822,  0.0527]])
     Classes: ['84', '62', '7', '20', '2']
 
-
-
-```
+```python
 names = [cat_to_name[class_] for class_ in classes]
-```
-
-
-```
 probs = probs.numpy()[0]
 ```
 
-
-```
+```python
 plt.barh(names, probs);
 ```
 
+![flower_predictions](assets/output_37_0.png)
 
-![png](assets/output_37_0.png)
-
-
-<font color='red'>**Reminder for Workspace users:** If your network becomes very large when saved as a checkpoint, there might be issues with saving backups in your workspace. You should reduce the size of your hidden layers and train again. 
-    
-We strongly encourage you to delete these large interim files and directories before navigating to another page or closing the browser tab.</font>
-
-
-```
-# TODO remove .pth files or move it to a temporary `~/opt` directory in this Workspace
-```
-
-
-```
-
-```
