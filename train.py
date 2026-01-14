@@ -14,8 +14,9 @@ import numpy as np
 import pandas as pd
 
 # define functions
-
 # function to get inputs
+
+
 def get_train_inputs():
     """
     returns:
@@ -40,7 +41,7 @@ def get_train_inputs():
     parser.add_argument('-e', '--epochs', type=int, default=10)
     parser.add_argument('-hu', '--hidden_units', type=int,
                         default=[1024, 512, 256])
-    parser.add_argument('--gpu', default='cuda', type=str,help="Choose the CPU or GPU for computation")
+    parser.add_argument('--gpu', default='cuda', type=str)
 
     # Parse the arguments
     args = parser.parse_args()
@@ -48,6 +49,8 @@ def get_train_inputs():
     return args
 
 # function to load the datset
+
+
 def load_dataset(data_dir):
     """
     parameters:
@@ -89,6 +92,8 @@ def load_dataset(data_dir):
     return test_data.class_to_idx, train_loader, valid_loader, test_loader
 
 # function to train the model
+
+
 def train(model, epochs, criterion, optimizer, train_loader, valid_loader, manual_seed=42):
     """
         Train the given model.
@@ -228,95 +233,87 @@ class FlowerClassifier(nn.Module):
         return x
 
 
+# function to train the model
 
 # main program
+# Label mapping
+with open('cat_to_name.json', 'r') as f:
+    cat_to_name = json.load(f)
 
-if __name__ == "__main__":
-    # Label mapping
-    # Assumed that the 'cat_to_name.json' is in the same directory,
-    # because no optional argument was parsed in the train.py
-
-    with open('cat_to_name.json', 'r') as f:
-        cat_to_name = json.load(f)
-
-    inputs = get_train_inputs()
-
-    data_dir = inputs.data_dir
-    save_dir = inputs.save_dir
-    architecture = inputs.arch
-    learning_rate = inputs.learning_rate
-    epochs = inputs.epochs
-    hidden_layers = inputs.hidden_units
-    processor = inputs.gpu
+inputs = get_train_inputs()
 
 
-    class_to_idx, train_loader, valid_loader, test_loader = load_dataset(
-        data_dir=data_dir)
+data_dir = inputs.data_dir
+save_dir = inputs.save_dir
+architecture = inputs.arch
+learning_rate = inputs.learning_rate
+epochs = inputs.epochs
+hidden_layers = inputs.hidden_units
+gpu = inputs.gpu
 
-    output_layer_size = len(cat_to_name)
-    # print(output_layer_size)
+
+class_to_idx, train_loader, valid_loader, test_loader = load_dataset(
+    data_dir=data_dir)
+
+output_layer_size = len(cat_to_name)
+# print(output_layer_size)
 
 
-    # Use GPU if it's available
-    if processor == 'gpu' and torch.cuda.is_available():
-        device = 'cuda'
-    else:
-        device = 'cpu'
-    device = torch.device(device)
-    
-    print(f'Using {device} for computation : ')
-    print(
-        f"settings :\n\tmodel_architecutre : {architecture}\n\tlearning rate : {learning_rate}\n\tepochs : {epochs}\n\t")
+# Use GPU if it's available
+device = torch.device(gpu)
+print(f'Using {device} for computation : ')
+print(
+    f"settings :\n\tmodel_architecutre : {architecture}\n\tlearning rate : {learning_rate}\n\tepochs : {epochs}\n\t")
 
-    # Choosing the model architecture
-    model_arch = {'densenet201': models.densenet201(pretrained=True),
-                'densenet161': models.densenet161(pretrained=True)}
-    model = model_arch[architecture]
+# Choosing the model architecture
+model_arch = {'densenet201': models.densenet201(pretrained=True),
+              'densenet161': models.densenet161(pretrained=True)}
+model = model_arch[architecture]
 
-    # Freeze parameters so we don't backprop through them
-    for param in model.parameters():
-        param.requires_grad = False
+# Freeze parameters so we don't backprop through them
+for param in model.parameters():
+    param.requires_grad = False
 
-    hidden_layer_units = hidden_layers
-    input_layer_size = model.classifier.in_features
+hidden_layer_units = hidden_layers
+input_layer_size = model.classifier.in_features
 
-    # exit()
-    my_classifier = FlowerClassifier(
-        input_layer_size, output_layer_size, hidden_layer_units, dropout_p=0.2)
-    model.classifier = my_classifier
+# exit()
+my_classifier = FlowerClassifier(
+    input_layer_size, output_layer_size, hidden_layer_units, dropout_p=0.2)
+model.classifier = my_classifier
 
-    model.to(device)
+model.to(device)
 
-    optimizer = optim.Adam(model.classifier.parameters(), lr=learning_rate)
-    criterion = nn.NLLLoss()
+optimizer = optim.Adam(model.classifier.parameters(), lr=learning_rate)
+criterion = nn.NLLLoss()
 
-    print()
-    print("Started training the model : \n")
-    model_list = train(model=model, epochs=epochs, criterion=criterion,
-                    optimizer=optimizer, train_loader=train_loader, valid_loader=valid_loader)
+print()
+print("Started training the model : \n")
+model_list = train(model=model, epochs=epochs, criterion=criterion,
+                   optimizer=optimizer, train_loader=train_loader, valid_loader=valid_loader)
 
-    # Save the model
-    # dataframe to store performance of the model, so that we can change the hyperparameters
-    model_performance_architecture_df = pd.DataFrame(model_list)
-    model_performance_architecture_df.rename(
-        columns={
-            0: 'epoch',
-            1: 'train_loss',
-            2: 'valid_loss',
-            3: 'valid_accuracy',
-            4: 'state_dict'
-        }, inplace=True)
+# Save the model
+# dataframe to store performance of the model, so that we can change the hyperparameters
+model_performance_architecture_df = pd.DataFrame(model_list)
+model_performance_architecture_df.rename(
+    columns={
+        0: 'epoch',
+        1: 'train_loss',
+        2: 'valid_loss',
+        3: 'valid_accuracy',
+        4: 'state_dict'
+    }, inplace=True)
 
-    model_performance_df = model_performance_architecture_df.iloc[:, :4]
+model_performance_df = model_performance_architecture_df.iloc[:, :4]
 
-    # TODO: Save the checkpoint
-    checkpoint = {'arch': architecture,
-                'input_size': input_layer_size,
-                'output_size': output_layer_size,
-                'hidden_layers': [each.out_features for each in model.classifier.hidden_layers],
-                'model_data': pd.DataFrame(model_list),
-                'class_to_idx': class_to_idx}
+# TODO: Save the checkpoint
+checkpoint = {'arch': architecture,
+              'input_size': input_layer_size,
+              'output_size': output_layer_size,
+              'hidden_layers': [each.out_features for each in model.classifier.hidden_layers],
+              'model_data': pd.DataFrame(model_list),
+              'class_to_idx': class_to_idx}
 
-    save_dir_path =  save_dir + "checkpoint.pth"
-    torch.save(checkpoint, save_dir)
-    print(f"Checkpoint saved to {save_dir_path}")
+save_dir_path =  "checkpoint.pth"
+torch.save(checkpoint, save_dir_path)
+print(f"Checkpoint saved to {save_dir_path}")

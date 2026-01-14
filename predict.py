@@ -31,7 +31,7 @@ def get_predict_inputs():
 
     parser.add_argument('-cn', '--category_names',
                         type=str, default='cat_to_name.json')
-    parser.add_argument('--gpu', default='cuda', type=str,help="Choose the CPU or GPU for computation")
+    parser.add_argument('--gpu', default='cuda', type=str)
 
     # Parse the arguments
     args = parser.parse_args()
@@ -121,36 +121,30 @@ def predict(image_path, model, topk):
     return probs, classes
 
 # Main program
-if __name__ == "__main__":
-    inputs = get_predict_inputs()
+inputs = get_predict_inputs()
 
-    img_path = inputs.img_dir
-    checkpoint = inputs.checkpoint
-    top_k = inputs.top_k
-    category_names = inputs.category_names
-    processor = inputs.gpu
+img_path = inputs.img_dir
+checkpoint = inputs.checkpoint
+top_k = inputs.top_k
+category_names = inputs.category_names
+gpu = inputs.gpu
 
-    # Use GPU if it's available
-    if processor == 'gpu' and torch.cuda.is_available():
-        device = 'cuda'
-    else:
-        device = 'cpu'
-    device = torch.device(device)
+# Label mapping
+with open('cat_to_name.json', 'r') as f:
+    cat_to_name = json.load(f)
 
-    # Label mapping
-    with open(category_names,'r') as f:
-        cat_to_name = json.load(f)
+# Use GPU if it's available
+device = torch.device(gpu)
 
-    # Load saved model
-    imported_model = load_checkpoint(checkpoint, idx=3)
+imported_model = load_checkpoint(checkpoint, idx=3)
 
-    probs, classes = predict(img_path, imported_model, top_k)
-    names = [cat_to_name[class_] for class_ in classes]
-    print(f"Most propable class is {names[0]} with a propability of {int(probs[0])}")
+probs, classes = predict(img_path, imported_model, top_k)
+names = [cat_to_name[class_] for class_ in classes]
+print(f"Most propable class is {names[0]} with a propability of {int(probs[0])}")
 
-    print(f"Other propable classes are :\n")
-    for i, val in enumerate(names[1:]):
-        print(f"\t{names[i]} : propability = {int(probs[i])}")
+print(f"Other propable classes are :\n")
+for i, val in enumerate(names[1:]):
+    print(f"\t{names[i]} : propability = {int(probs[i])}")
 
-    print("\nDone prediction!")
+print("\nDone prediction!")
 
